@@ -1,0 +1,13 @@
+# Security Credentials
+.env
+client_secret.json
+token.json
+
+# Python & Virtual Environment
+.venv/
+__pycache__/
+*.pyc
+
+# Database & Logs
+youtube_briefing.db
+cron_log.txt
