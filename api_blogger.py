@@ -37,15 +37,19 @@ class BloggerPublisher:
                     delay *= 2
                 else:
                     raise e
-
+    
     def publish_video_post(self, analysis):
         try:
-            core_facts = json.loads(analysis.get('core_fact', '[]'))
-            insights = json.loads(analysis.get('actionable_insight', '[]'))
+            # 메모리에서 온 List인지, DB에서 온 String인지 판별하여 유연하게 처리합니다.
+            raw_facts = analysis.get('core_fact', [])
+            core_facts = json.loads(raw_facts) if isinstance(raw_facts, str) else raw_facts
+            
+            raw_insights = analysis.get('actionable_insight', [])
+            insights = json.loads(raw_insights) if isinstance(raw_insights, str) else raw_insights
             
             html_content = (
                 f'<div style="text-align:center;margin-bottom:20px;">'
-                f'<img src="{analysis.get("thumbnail_url", "")}" alt="thumbnail" style="max-width:100%;border-radius:8px;"/></div>'
+                f'<img src="{analysis.get("thumbnailUrl", analysis.get("thumbnail_url", ""))}" alt="thumbnail" style="max-width:100%;border-radius:8px;"/></div>'
                 f'<h3>핵심 사실 (Core Facts)</h3><ul>'
                 + ''.join([f'<li>{f}</li>' for f in core_facts]) +
                 f'</ul><h3>시사점 (Actionable Insights)</h3><ul>'
@@ -53,7 +57,7 @@ class BloggerPublisher:
                 f'</ul><h3>정보 가치 평가 (Evaluation)</h3>'
                 f'<p>{analysis.get("grade", "N/A")} ({analysis.get("score", 0)}/100) | 신호 비율: {analysis.get("signal_ratio", "N/A")}</p>'
                 f'<p>{analysis.get("reasoning", "")}</p>'
-                f'<p><a href="{analysis.get("video_url", "")}">원본 영상 보기</a></p>'
+                f'<p><a href="{analysis.get("video_url", f"https://youtube.com/watch?v={analysis.get("videoId", "")}")}">원본 영상 보기</a></p>'
             )
 
             body = {
@@ -66,9 +70,9 @@ class BloggerPublisher:
 
             request = self.service.posts().insert(blogId=self.blog_id, body=body, isDraft=False)
             self._fetch_with_backoff(request)
-            print(f"[발행 완료] {analysis.get('title')}")
+            print(f"  [발행 완료] {analysis.get('title')}")
         except Exception as e:
-            print(f"[발행 실패] {analysis.get('title')}: {str(e)}")
+            print(f"  [발행 실패] {analysis.get('title')}: {str(e)}")
 
     def publish_briefing_post(self, briefing, analyses, categories):
         try:
