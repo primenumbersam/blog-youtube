@@ -47,6 +47,18 @@ class BloggerPublisher:
             raw_insights = analysis.get('actionable_insight', [])
             insights = json.loads(raw_insights) if isinstance(raw_insights, str) else raw_insights
             
+            info_val = analysis.get('information_value')
+            if info_val is None:
+                grade = analysis.get("grade", "N/A")
+                score = analysis.get("score", 0)
+                signal_ratio = analysis.get("signal_ratio", "N/A")
+                reasoning = analysis.get("reasoning", "")
+            else:
+                grade = info_val.get("grade", "N/A")
+                score = info_val.get("score", 0)
+                signal_ratio = info_val.get("signal_ratio", "N/A")
+                reasoning = info_val.get("reasoning", "")
+            
             html_content = (
                 f'<div style="text-align:center;margin-bottom:20px;">'
                 f'<img src="{analysis.get("thumbnailUrl", analysis.get("thumbnail_url", ""))}" alt="thumbnail" style="max-width:100%;border-radius:8px;"/></div>'
@@ -55,8 +67,8 @@ class BloggerPublisher:
                 f'</ul><h3>시사점 (Actionable Insights)</h3><ul>'
                 + ''.join([f'<li>{i}</li>' for i in insights]) +
                 f'</ul><h3>정보 가치 평가 (Evaluation)</h3>'
-                f'<p>{analysis.get("grade", "N/A")} ({analysis.get("score", 0)}/100) | 신호 비율: {analysis.get("signal_ratio", "N/A")}</p>'
-                f'<p>{analysis.get("reasoning", "")}</p>'
+                f'<p>{grade} ({score}/100) | 신호 비율: {signal_ratio}</p>'
+                f'<p>{reasoning}</p>'
                 f'<p><a href="{analysis.get("video_url", f"https://youtube.com/watch?v={analysis.get("videoId", "")}")}">원본 영상 보기</a></p>'
             )
 
@@ -80,13 +92,15 @@ class BloggerPublisher:
             gallery = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">'
             
             for a in analyses:
+                video_url = a.get("video_url", f"https://youtube.com/watch?v={a.get('videoId', '')}")
+                thumbnail_link = a.get("thumbnailUrl", a.get("thumbnail_url", ""))
                 gallery += (
-                    f'<a href="{a.get("video_url", "")}">'
-                    f'<img src="{a.get("thumbnail_url", "")}" alt="thumbnail" style="width:180px;border-radius:6px;"/></a>'
+                    f'<a href="{video_url}">'
+                    f'<img src="{thumbnail_link}" alt="thumbnail" style="width:180px;border-radius:6px;"/></a>'
                 )
             gallery += '</div>'
 
-            html_content = gallery + briefing.get('html_body', '')
+            html_content = gallery + briefing.get('htmlBody', briefing.get('html_body', ''))
 
             body = {
                 'kind': 'blogger#post',

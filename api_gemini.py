@@ -1,13 +1,14 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 class GeminiAnalyzer:
     def __init__(self):
-        api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
+        self.api_key = os.getenv('GEMINI_API_KEY')
+        if not self.api_key:
             print("[경고] .env 파일에 GEMINI_API_KEY가 없습니다.")
-        genai.configure(api_key=api_key)
+        self.client = genai.Client(api_key=self.api_key)
 
     def _get_system_instruction(self, category):
         base = (
@@ -112,11 +113,6 @@ class GeminiAnalyzer:
         schema = self._get_analysis_schema()
         system_instruction = self._get_system_instruction(video_data['category'])
         
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=system_instruction
-        )
-        
         prompt = f"아래 영상 텍스트에서 신호와 소음을 분리 분석하십시오.\n\n제목: {video_data['title']}\n채널: {video_data['channel']}\n"
         
         if video_data.get('transcript'):
@@ -125,9 +121,11 @@ class GeminiAnalyzer:
             prompt += f"\n[영상 설명]\n{video_data['description']}"
 
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
                     response_mime_type="application/json",
                     response_schema=schema
                 )
@@ -141,7 +139,6 @@ class GeminiAnalyzer:
 
     def generate_briefing(self, summaries, model_name):
         schema = self._get_briefing_schema()
-        model = genai.GenerativeModel(model_name=model_name)
         
         prompt = (
             "아래 영상 요약을 바탕으로 '오늘의 브리핑'을 작성해줘.\n"
@@ -150,9 +147,10 @@ class GeminiAnalyzer:
         )
 
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=schema
                 )
