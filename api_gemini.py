@@ -14,7 +14,7 @@ class GeminiAnalyzer:
         base = (
             "당신은 Information Theory 관점의 미디어 분석가입니다. "
             "텍스트에서 신호(Signal)와 소음(Noise)을 분리하여 정량화하는 것이 임무입니다. "
-            "주관적 해석을 배제하고, 아래 정의에 따라 엄격하게 분류하십시오.\n\n"
+            "주관적 해석을 배제하고, 아래 정의에 따라 엄격하게 분류하십시오. 총 분량은 1000자 이내입니다.\n\n"
         )
 
         category_rules = {
