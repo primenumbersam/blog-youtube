@@ -2,6 +2,7 @@ import os
 import json
 import time
 from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -12,10 +13,26 @@ class BloggerPublisher:
             print("[경고] .env 파일에 BLOG_ID가 설정되지 않았습니다.")
         
         creds = None
+        SCOPES = ['https://www.googleapis.com/auth/blogger']
+        
         if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/blogger'])
-        else:
-            print("[오류] token.json 파일이 없습니다. auth_test.py를 실행하여 권한을 확보하십시오.")
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+            
+        # 토큰이 없거나 유효하지 않은 경우 처리
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    print("[알림] Blogger API 토큰이 만료되었습니다. 갱신을 시도합니다...")
+                    creds.refresh(Request())
+                    # 갱신된 토큰 저장
+                    with open('token.json', 'w') as token_file:
+                        token_file.write(creds.to_json())
+                    print("[완료] 토큰이 성공적으로 갱신되었습니다.")
+                except Exception as e:
+                    print(f"[오류] 토큰 갱신 실패: {str(e)}")
+                    print("[안내] 다시 인증이 필요할 수 있습니다. test_auth.py를 실행하세요.")
+            else:
+                print("[오류] 유효한 token.json이 없습니다. test_auth.py를 실행하십시오.")
             
         self.service = build('blogger', 'v3', credentials=creds)
 
@@ -41,11 +58,18 @@ class BloggerPublisher:
     def publish_video_post(self, analysis):
         try:
             # 메모리에서 온 List인지, DB에서 온 String인지 판별하여 유연하게 처리합니다.
-            raw_facts = analysis.get('core_fact', [])
-            core_facts = json.loads(raw_facts) if isinstance(raw_facts, str) else raw_facts
-            
-            raw_insights = analysis.get('actionable_insight', [])
-            insights = json.loads(raw_insights) if isinstance(raw_insights, str) else raw_insights
+            def parse_json_field(field):
+                if isinstance(field, (list, dict)):
+                    return field
+                if isinstance(field, str):
+                    try:
+                        return json.loads(field)
+                    except (json.JSONDecodeError, TypeError):
+                        return [field] if field else []
+                return []
+
+            core_facts = parse_json_field(analysis.get('core_fact', []))
+            insights = parse_json_field(analysis.get('actionable_insight', []))
             
             info_val = analysis.get('information_value')
             if info_val is None:

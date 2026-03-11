@@ -21,8 +21,13 @@ def get_blogger_service():
     # 인증 정보가 없거나 유효하지 않으면 새로 인증 진행
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                print(f"[알림] 토큰 갱신 실패 ({str(e)}). 새로 인증을 진행합니다.")
+                creds = None
+
+        if not creds:
             # GCC에서 다운로드한 client_secret.json 경로
             flow = InstalledAppFlow.from_client_secrets_file(
                 'client_secret.json', SCOPES)
