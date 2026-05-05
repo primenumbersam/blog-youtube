@@ -19,8 +19,8 @@ class PipelineOrchestrator:
         self.blogger = BloggerPublisher()
         self.config_data = []
         
-        self.analysis_model = "gemini-2.5-flash"
-        self.briefing_model = "gemini-2.5-pro"
+        self.analysis_model = "gemini-flash-lite-latest"
+        self.briefing_model = "gemini-flash-lite-latest"
 
     def load_config(self):
         print("[1단계] 설정 파일 로드 시작")
@@ -102,7 +102,7 @@ class PipelineOrchestrator:
             self.db.close()
             return
 
-        print("\n[6단계] Gemini Pro 통합 브리핑 생성")
+        print("\n[6단계] Gemini 통합 브리핑 생성")
         briefing_data = self.gemini.generate_briefing(analyzed_results, self.briefing_model)
         if briefing_data:
             today_str = datetime.now().strftime("%Y-%m-%d")
