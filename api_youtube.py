@@ -64,9 +64,10 @@ class YouTubeAgent:
                     
         return updated
 
-    def fetch_videos(self, config_data):
+    def fetch_videos(self, config_data, days=1.0):
         results = []
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=1)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(days=days)
+        sample_count = min(50, max(10, int(15 * days)))
         
         for row in config_data:
             category = row.get('Category')
@@ -81,12 +82,12 @@ class YouTubeAgent:
                 
             try:
                 if 'newest' in criteria:
-                    video = self._fetch_newest(playlist_id, cutoff_time)
+                    video = self._fetch_newest(playlist_id, cutoff_time, max_results=sample_count)
                     if video:
                         self._append_video_info(results, video, category, channel)
                 
                 elif 'most viewed' in criteria:
-                    video = self._fetch_most_viewed(playlist_id, cutoff_time)
+                    video = self._fetch_most_viewed(playlist_id, cutoff_time, max_results=sample_count)
                     if video:
                         self._append_video_info(results, video, category, channel)
                         
@@ -95,11 +96,11 @@ class YouTubeAgent:
                 
         return results
 
-    def _fetch_newest(self, playlist_id, cutoff_time):
+    def _fetch_newest(self, playlist_id, cutoff_time, max_results=10):
         response = self.youtube.playlistItems().list(
             part='contentDetails',
             playlistId=playlist_id,
-            maxResults=10
+            maxResults=min(50, max_results)
         ).execute()
         
         items = response.get('items', [])
@@ -123,16 +124,16 @@ class YouTubeAgent:
             duration_str = v['contentDetails']['duration']
             duration_sec = self._parse_duration_to_seconds(duration_str)
             
-            if pub_time >= cutoff_time and duration_sec <= 3600:
+            if pub_time >= cutoff_time and 180 < duration_sec <= 3600:
                 return v
                 
         return None
 
-    def _fetch_most_viewed(self, playlist_id, cutoff_time):
+    def _fetch_most_viewed(self, playlist_id, cutoff_time, max_results=15):
         list_response = self.youtube.playlistItems().list(
             part='contentDetails',
             playlistId=playlist_id,
-            maxResults=15
+            maxResults=min(50, max_results)
         ).execute()
         
         video_ids = [item['contentDetails']['videoId'] for item in list_response.get('items', [])]
@@ -155,7 +156,7 @@ class YouTubeAgent:
             duration_str = v['contentDetails']['duration']
             duration_sec = self._parse_duration_to_seconds(duration_str)
             
-            if pub_time >= cutoff_time and duration_sec <= 3600:
+            if pub_time >= cutoff_time and 180 < duration_sec <= 3600:
                 recent_videos.append(v)
                 
         if recent_videos:
@@ -196,3 +197,11 @@ class YouTubeAgent:
         except Exception as e:
             print(f"  [자막 없음/추출 실패] {video_id}: {str(e)}")
             return None
+
+if __name__ == '__main__':
+    agent = YouTubeAgent()
+    sample_id = "SUpRFwsjtBM"
+    print(f"[단독 테스트] 자막 추출 시도: {sample_id}")
+    transcript = agent.extract_transcript(sample_id)
+    if transcript:
+        print("[성공] 자막 미리보기:\n" + transcript[:200] + "...")

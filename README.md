@@ -36,50 +36,50 @@ The Google Cloud Console (GCC) is used for authorization and quota management:
 
 ## Installation and Setup
 
-1. Clone the repository and create a virtual environment:
+1. 가상환경 생성 및 활성화:
    ```bash
-   cd ~/github/blog-youtube
    python3 -m venv .venv
    source .venv/bin/activate
    ```
-2. Install required packages:
+2. 의존성 패키지 설치:
    ```bash
-   pip install --upgrade \
-     google-api-python-client \
-     google-auth-oauthlib \
-     google-auth-httplib2 \
-     google-generativeai \
-     youtube-transcript-api \
-     python-dotenv
+   pip install --upgrade pip
+   pip install -r requirements.txt
    ```
-3. Create a `.env` file in the project root with the following variables:
+3. 프로젝트 루트에 `.env` 파일 설정:
    ```env
    YOUTUBE_API_KEY=your_youtube_api_key_here
    GEMINI_API_KEY=your_gemini_api_key_here
    BLOG_ID=your_blogger_blog_id_here
    ```
 
-## Initial Authorization
+## Authorization & Verification
 
-Grant the necessary Blogger publishing permissions by running:
+Blogger API 인증 및 연동 상태 점검:
 ```bash
-python test_auth.py
+python api_blogger.py
 ```
-A `token.json` file will be created in the project root, enabling the script to run unattended thereafter.
+`token.json`이 없거나 만료된 경우 로컬 브라우저가 실행되며 OAuth 인증이 자동 진행됩니다. 인증이 완료되면 점검용 초안(Draft) 포스트가 블로그에 생성됩니다.
 
-## Automation via cron
-
-To run the orchestrator daily, add a cron entry:
+YouTube 자막 추출 단독 점검:
 ```bash
-crontab -e
+python api_youtube.py
 ```
-Then append (adjust the time/path as needed):
-```cron
-0 10 * * * cd /home/sam/github/blog-youtube && \
-  /home/sam/github/blog-youtube/.venv/bin/python main_orchestrator.py \
-  >> /home/sam/github/blog-youtube/cron_log.txt 2>&1
+
+## Manual Workflow Execution
+
+원할 때 로컬에서 수동으로 파이프라인을 실행합니다:
+
+```bash
+# 기본 실행 (실행 시점 기준 최근 24시간 영상 수집 및 Blogger 발행)
+./run.sh
+
+# 기간 옵션 지정 (예: 최근 3일간 영상 대상)
+./run.sh --days 3
+
+# 드라이 런 (API 분석/발행 없이 영상 수집 대상 및 DB 중복 필터링 결과만 점검)
+./run.sh --days 1 --dry-run
 ```
-Ensure you use absolute paths.
 
 ## Security notice
 

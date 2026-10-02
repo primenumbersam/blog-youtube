@@ -3,38 +3,60 @@ import json
 import time
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class BloggerPublisher:
-    def __init__(self):
+    SCOPES = ['https://www.googleapis.com/auth/blogger']
+
+    def __init__(self, token_path='token.json', client_secret_path='client_secret.json'):
         self.blog_id = os.getenv('BLOG_ID')
+        self.token_path = token_path
+        self.client_secret_path = client_secret_path
         if not self.blog_id:
             print("[경고] .env 파일에 BLOG_ID가 설정되지 않았습니다.")
         
+        creds = self._get_credentials()
+        self.service = build('blogger', 'v3', credentials=creds)
+
+    def _get_credentials(self):
         creds = None
-        SCOPES = ['https://www.googleapis.com/auth/blogger']
-        
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-            
-        # 토큰이 없거나 유효하지 않은 경우 처리
+        if os.path.exists(self.token_path):
+            try:
+                creds = Credentials.from_authorized_user_file(self.token_path, self.SCOPES)
+            except Exception as e:
+                print(f"[경고] token.json 읽기 실패: {str(e)}")
+
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 try:
                     print("[알림] Blogger API 토큰이 만료되었습니다. 갱신을 시도합니다...")
                     creds.refresh(Request())
-                    # 갱신된 토큰 저장
-                    with open('token.json', 'w') as token_file:
+                    with open(self.token_path, 'w', encoding='utf-8') as token_file:
                         token_file.write(creds.to_json())
                     print("[완료] 토큰이 성공적으로 갱신되었습니다.")
+                    return creds
                 except Exception as e:
-                    print(f"[오류] 토큰 갱신 실패: {str(e)}")
-                    print("[안내] 다시 인증이 필요할 수 있습니다. test_auth.py를 실행하세요.")
-            else:
-                print("[오류] 유효한 token.json이 없습니다. test_auth.py를 실행하십시오.")
-            
-        self.service = build('blogger', 'v3', credentials=creds)
+                    print(f"[오류] 토큰 갱신 실패: {str(e)}. 새로 인증을 시도합니다.")
+                    creds = None
+
+            if not creds:
+                if not os.path.exists(self.client_secret_path):
+                    raise FileNotFoundError(
+                        f"[오류] {self.client_secret_path} 파일이 없습니다. Google Cloud Console에서 OAuth 클라이언트 시크릿을 다운로드하세요."
+                    )
+                print("[알림] 브라우저를 통해 Blogger OAuth 인증을 진행합니다...")
+                flow = InstalledAppFlow.from_client_secrets_file(self.client_secret_path, self.SCOPES)
+                creds = flow.run_local_server(port=0)
+                with open(self.token_path, 'w', encoding='utf-8') as token_file:
+                    token_file.write(creds.to_json())
+                print(f"[완료] 새 인증 토큰을 {self.token_path}에 저장했습니다.")
+
+        return creds
 
     def _fetch_with_backoff(self, request, max_retries=3):
         retries = 0
@@ -96,10 +118,14 @@ class BloggerPublisher:
                 f'<p><a href="{analysis.get("video_url", f"https://youtube.com/watch?v={analysis.get("videoId", "")}")}">원본 영상 보기</a></p>'
             )
 
+            raw_title = analysis.get('title', '제목 없음')
+            channel = analysis.get('channel', '')
+            post_title = f"[{channel}] {raw_title}" if channel else raw_title
+
             body = {
                 'kind': 'blogger#post',
                 'blog': {'id': self.blog_id},
-                'title': analysis.get('title', '제목 없음'),
+                'title': post_title,
                 'content': html_content,
                 'labels': [analysis.get('category', '미분류')]
             }
@@ -129,7 +155,7 @@ class BloggerPublisher:
             body = {
                 'kind': 'blogger#post',
                 'blog': {'id': self.blog_id},
-                'title': f'{today} 일간 미디어 브리핑',
+                'title': f'{today} 브리핑',
                 'content': html_content,
                 'labels': categories
             }
@@ -139,3 +165,28 @@ class BloggerPublisher:
             print("[통합 브리핑 발행 완료]")
         except Exception as e:
             print(f"[통합 브리핑 발행 실패] {str(e)}")
+
+    def check_connection(self, is_draft=True):
+        """Blogger API 연동 및 권한을 점검하는 테스트 포스트를 발행합니다."""
+        if not self.blog_id:
+            print("[오류] BLOG_ID가 설정되지 않았습니다.")
+            return False
+
+        try:
+            body = {
+                'kind': 'blogger#post',
+                'title': '🛠 Blogger 연동 점검 포스트',
+                'content': '<p>Blogger API 연동이 정상 작동 중입니다.</p>'
+            }
+            request = self.service.posts().insert(blogId=self.blog_id, body=body, isDraft=is_draft)
+            result = request.execute()
+            status_text = "초안(Draft)" if is_draft else "발행"
+            print(f"[성공] Blogger {status_text} 포스트 생성 완료 (ID: {result.get('id')})")
+            return True
+        except Exception as e:
+            print(f"[오류] Blogger 연동 점검 실패: {str(e)}")
+            return False
+
+if __name__ == '__main__':
+    publisher = BloggerPublisher()
+    publisher.check_connection(is_draft=True)
