@@ -1,7 +1,10 @@
 import os
 import json
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+load_dotenv()
 
 class GeminiAnalyzer:
     def __init__(self):
@@ -127,7 +130,8 @@ class GeminiAnalyzer:
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     response_mime_type="application/json",
-                    response_schema=schema
+                    response_schema=schema,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
                 )
             )
             
@@ -152,7 +156,8 @@ class GeminiAnalyzer:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=schema
+                    response_schema=schema,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
                 )
             )
             
